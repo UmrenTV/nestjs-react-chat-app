@@ -19,12 +19,15 @@ const { io } = require("socket.io-client"); // Make sure socket.io-client is ins
             }),
         });
 
-        console.log(
-            "Register successful. Username:",
-            username,
-            "Password:",
-            password
-        );
+        if (registerRes.ok) {
+            console.log(
+                "Register successful. Username:",
+                username,
+                "Password:",
+                password
+            );
+        }
+
         console.log(
             `Trying to login with username ${username} and password ${password}`
         );
@@ -67,11 +70,12 @@ const { io } = require("socket.io-client"); // Make sure socket.io-client is ins
         });
 
         // 3. Emit a test message immediately
-        socket.emit("sendMessage", { content: "Hello from test client!" });
+        console.log("Sending new test message...");
+        socket.emit("sendMessage", { content: "New test message." });
 
         // 4. Emit another message 3 seconds later
         setTimeout(() => {
-            console.log("Sending another new message");
+            console.log("Sending another new message...");
             socket.emit("sendMessage", {
                 content: "New message from test client after 3s",
             });
