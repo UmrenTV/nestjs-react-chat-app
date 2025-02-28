@@ -1,47 +1,82 @@
 // quick-test.js
-const io = require("socket.io-client");
+const { io } = require("socket.io-client"); // Make sure socket.io-client is installed
 
-// create a POST request to auth/login with username 'jane' and password 'newpassword' and then store the token it returns to loginToken
-const loginToken = fetch("http://localhost:3000/auth/login", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-        username: "jane",
-        password: "newpassword",
-    }),
-});
+// Wrap everything in an async function:
+(async () => {
+    try {
+        // 0. Register with random credentials
+        const username = Math.random().toString(36).substring(2);
+        const password = Math.random().toString(36).substring(2);
 
-if (loginToken.ok) {
-    console.log("Login successful", loginToken.token);
-}
+        const registerRes = await fetch("http://localhost:3000/auth/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                username,
+                password,
+            }),
+        });
 
-const socket = io("http://localhost:3000", {
-    auth: {
-        token: loginToken.token,
-    },
-});
+        console.log(
+            "Register successful. Username:",
+            username,
+            "Password:",
+            password
+        );
+        console.log(
+            `Trying to login with username ${username} and password ${password}`
+        );
 
-socket.on("connect", () => {
-    console.log("Connected to server!");
-});
+        // 1. Log in to get the token
+        const loginRes = await fetch("http://localhost:3000/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password,
+            }),
+        });
 
-socket.on("allMessages", (messages) => {
-    console.log("Existing messages:", messages);
-});
+        if (!loginRes.ok) {
+            throw new Error(`Login failed: HTTP ${loginRes.status}`);
+        }
 
-socket.on("newMessage", (message) => {
-    console.log("Received new message:", message);
-});
+        const loginData = await loginRes.json();
+        const loginToken = loginData.token;
+        console.log("Login successful. Token:", loginToken);
 
-socket.emit("sendMessage", { content: "Hello from test client!" });
+        // 2. Connect via Socket.IO using the token in the auth field
+        const socket = io("http://localhost:3000", {
+            auth: { token: loginToken },
+        });
 
-setTimeout(() => {
-    console.log("Sending new message");
-    socket.emit("sendMessage", { content: "New Message from test client!" });
-}, 3000);
+        socket.on("connect", () => {
+            console.log("Connected to server! ID:", socket.id);
+        });
 
-setTimeout(() => {
-    console.log("Waiting on messages");
-}, 10000);
+        socket.on("allMessages", (messages) => {
+            console.log("Existing messages:", messages);
+        });
+
+        socket.on("newMessage", (message) => {
+            console.log("Received new message:", message);
+        });
+
+        // 3. Emit a test message immediately
+        socket.emit("sendMessage", { content: "Hello from test client!" });
+
+        // 4. Emit another message 3 seconds later
+        setTimeout(() => {
+            console.log("Sending another new message");
+            socket.emit("sendMessage", {
+                content: "New message from test client after 3s",
+            });
+        }, 3000);
+    } catch (err) {
+        console.error("Error:", err);
+    }
+})();
